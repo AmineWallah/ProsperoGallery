@@ -97,10 +97,11 @@ static void handle_client(int client) {
     }
 
     // "/media/x.mp4?download" -> path "/media/x.mp4", download = true
-    bool download = false;
+    bool download = false, original = false;
     char *query = strchr(path, '?');
     if (query != NULL) {
         download = strstr(query + 1, "download") != NULL;
+        original = strstr(query + 1, "original") != NULL;
         *query = '\0';
     }
 
@@ -124,7 +125,7 @@ static void handle_client(int client) {
             send_text(client, 500, "Out of memory");
         buf_free(&b);
     } else if (strncmp(path, "/media/", 7) == 0) {
-        serve_file(client, MEDIA_ROOT, path + 7, range, download);
+        serve_file(client, MEDIA_ROOT, path + 7, range, download, original);
     } else if (strcmp(path, "/connect") == 0) {
         send_response(client, 200, "text/html; charset=utf-8",
                       web_connect_html, web_connect_html_len);

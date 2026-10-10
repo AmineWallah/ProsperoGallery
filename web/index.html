@@ -109,6 +109,7 @@
   <div class="viewer-top">
     <div class="info"><div id="v-date"></div><div id="v-sub"></div></div>
     <a id="v-download" href="#">Download</a>
+    <a id="v-original" href="#" title="The HDR original. Opens in the Windows Photos app, for example.">Original HDR</a>
     <button id="v-close" aria-label="Close">&#x2715;</button>
   </div>
   <div class="stage" id="stage">
@@ -146,6 +147,7 @@ function parseItem(path) {
     type: parts[0] === "video" ? "video" : "photo",
     game: parts[2] || "Unknown",
     file,
+    hdr: file.toLowerCase().endsWith(".jxr"),   // HDR screenshot; the server converts it to JPG
     date,
     sortKey: m ? m.slice(1).join("") : file,
   };
@@ -228,6 +230,13 @@ function makeTile(it, index) {
     tag.className = "tag";
     tag.textContent = gameName(it.game);
     tile.appendChild(tag);
+  }
+
+  if (it.hdr) {
+    const badge = document.createElement("span");
+    badge.className = "badge";
+    badge.textContent = "HDR";
+    tile.appendChild(badge);
   }
 
   if (it.type === "photo") {
@@ -408,6 +417,8 @@ function showCurrent() {
   $("v-date").textContent = it.date ? dayFormat.format(it.date) + ", " + timeFormat.format(it.date) : it.file;
   $("v-sub").textContent = gameName(it.game) + " · " + it.file;
   $("v-download").href = mediaUrl(it.path) + "?download";
+  $("v-original").href = mediaUrl(it.path) + "?original&download";
+  $("v-original").style.display = it.hdr ? "" : "none";
   $("v-prev").disabled = current <= 0;
   $("v-next").disabled = current >= shown.length - 1;
 }

@@ -5,9 +5,11 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
 
 // Captures live at  <root>/<kind>/NPXS40087/<TitleID>/<dir>/<file>
-// where kind is "photo" or "video". Next to every .jpg/.mp4 there's a
+// where kind is "photo" or "video". Screenshots are .jpg/.png, or .jxr for
+// HDR ones; videos are .mp4 or .webm. Next to every capture there's a
 // .dat file that holds the game's name (at offset 0x44), e.g.
 //   "ASTRO's PLAYROOM_20260319211421"
 
@@ -48,6 +50,18 @@ static void append_json_string(Buffer *out, const char *s)
         buf_append(out, tmp);
     }
     buf_append(out, "\"");
+}
+
+// True if an HDR screenshot also has a plain .jpg next to it, in which case
+// only the .jpg is listed.
+static bool has_jpg_twin(const char *root, const char *rel)
+{
+    char path[1024];
+    int len = snprintf(path, sizeof(path), "%s/%s", root, rel);
+    if (len < 4 || (size_t)len >= sizeof(path)) return false;
+    memcpy(path + len - 4, ".jpg", 4);
+    struct stat st;
+    return stat(path, &st) == 0;
 }
 
 static bool title_seen(const Scan *scan, const char *title_id)
@@ -111,7 +125,10 @@ static void walk(const char *root, const char *rel, int depth, Scan *scan)
 
         if (depth < 3) {
             walk(root, child, depth + 1, scan);
-        } else if (ends_with(name, ".jpg") || ends_with(name, ".mp4")) {
+        } else if (ends_with(name, ".jpg") || ends_with(name, ".png") ||
+                   ends_with(name, ".jxr") || ends_with(name, ".mp4") ||
+                   ends_with(name, ".webm")) {
+            if (ends_with(name, ".jxr") && has_jpg_twin(root, child)) continue;
             if (scan->captures->len > 0) buf_append(scan->captures, ",");
             append_json_string(scan->captures, child);
         } else if (ends_with(name, ".dat")) {

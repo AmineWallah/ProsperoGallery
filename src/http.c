@@ -1,4 +1,5 @@
 #include "http.h"
+#include "jxr.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -69,7 +70,10 @@ static bool ends_with(const char *s, const char *suffix) {
 
 static const char *content_type_for(const char *path) {
     if (ends_with(path, ".jpg")) return "image/jpeg";
+    if (ends_with(path, ".png")) return "image/png";
+    if (ends_with(path, ".jxr")) return "image/vnd.ms-photo";
     if (ends_with(path, ".mp4")) return "video/mp4";
+    if (ends_with(path, ".webm")) return "video/webm";
     return "application/octet-stream";
 }
 
@@ -98,18 +102,36 @@ static const char *base_name(const char *path) {
 // rel is the part of the URL after "/media/",
 // e.g. "photo/NPXS40087/PPSA01234/abc/20260101_120000_00000001.jpg"
 void serve_file(int client, const char *root, const char *rel,
-                const char *range, bool download) {
-    // 1. Refuse anything that could climb out of root.
+                const char *range, bool download, bool original) {
+    // Refuse anything that could climb out of root.
     if (rel[0] == '/' || strstr(rel, "..") != NULL) {
         send_text(client, 404, "Not found");
         return;
     }
 
-    // 2. Turn the URL part into a real path on disk.
     char full[1024];
     snprintf(full, sizeof(full), "%s/%s", root, rel);
 
-    // 3. Does it exist, is it a normal file, and how big is it?
+    // HDR screenshots: send a converted JPG unless the original was asked for.
+    if (ends_with(full, ".jxr") && !original) {
+        char jpg[1024];
+        if (!jxr_cached_jpg(full, jpg, sizeof(jpg))) {
+            send_text(client, 404, "Couldn't convert this screenshot");
+            return;
+        }
+        char name[1024];
+        snprintf(name, sizeof(name), "%s", base_name(full));
+        char *dot = strrchr(name, '.');
+        if (dot != NULL) snprintf(dot, sizeof(name) - (size_t)(dot - name), ".jpg");
+        serve_path(client, jpg, range, download ? name : NULL);
+        return;
+    }
+
+    serve_path(client, full, range, download ? base_name(full) : NULL);
+}
+
+void serve_path(int client, const char *full, const char *range, const char *download_name) {
+    // Does it exist, is it a normal file, and how big is it?
     struct stat st;
     if (stat(full, &st) != 0 || !S_ISREG(st.st_mode)) {
         send_text(client, 404, "Not found");
@@ -140,9 +162,9 @@ void serve_file(int client, const char *root, const char *rel,
             return;
         }
     }
-    if (download) {
+    if (download_name != NULL) {
         snprintf(extra + extra_len, sizeof(extra) - extra_len,
-                 "Content-Disposition: attachment; filename=\"%s\"\r\n", base_name(full));
+                 "Content-Disposition: attachment; filename=\"%s\"\r\n", download_name);
     }
 
     long long remaining = end - start + 1;   // +1 because end is inclusive
@@ -151,7 +173,7 @@ void serve_file(int client, const char *root, const char *rel,
         return;
     }
 
-    // 5. Then the bytes, 64 KB at a time. Each connection runs in its own
+    // Then the bytes, 64 KB at a time. Each connection runs in its own
     // thread, so each one needs its own buffer (a static one would be shared).
     char *chunk = malloc(CHUNK_SIZE);
     if (chunk == NULL) {
