@@ -1,0 +1,11 @@
+# Build output
+build/
+cmake-build-*/
+server
+*.elf
+
+# IDE
+.idea/
+
+# Your own captures, used for testing on PC
+test_folder/

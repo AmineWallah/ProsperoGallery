@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0d12">
+<title>ProsperoGallery</title>
+<style>
+  :root {
+    --bg: #0b0d12;
+    --surface: #151922;
+    --surface-2: #1d2230;
+    --border: #262c3b;
+    --text: #e8ebf2;
+    --muted: #8a93a6;
+    --accent: #3d7bff;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  button, select { font: inherit; color: inherit; }
+
+  /* Top bar */
+  header { position: sticky; top: 0; z-index: 5; background: rgba(11,13,18,.92);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
+    padding: 12px max(16px, env(safe-area-inset-left)) 12px max(16px, env(safe-area-inset-right)); }
+  .bar { max-width: 1400px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+  h1 { font-size: 18px; margin: 0; font-weight: 650; letter-spacing: .2px; }
+  .count { color: var(--muted); font-size: 13px; margin-left: 6px; font-weight: 400; }
+  .spacer { flex: 1; }
+  .segmented { display: inline-flex; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 999px; padding: 3px; }
+  .segmented button { border: 0; background: none; padding: 6px 14px; border-radius: 999px; cursor: pointer; color: var(--muted); }
+  .segmented button.on { background: var(--surface-2); color: var(--text); }
+  select { background: var(--surface); border: 1px solid var(--border); border-radius: 999px;
+    padding: 7px 12px; max-width: 260px; }
+  .icon-btn { background: var(--surface); border: 1px solid var(--border); border-radius: 999px;
+    width: 36px; height: 36px; display: inline-grid; place-items: center; cursor: pointer; }
+
+  /* Grid */
+  main { max-width: 1400px; margin: 0 auto; padding: 8px 16px 48px; }
+  .day { margin: 22px 0 10px; font-size: 14px; font-weight: 600; color: var(--muted); }
+  .grid { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+  @media (max-width: 600px) {
+    .grid { grid-template-columns: repeat(2, 1fr); gap: 4px; }
+    main { padding: 4px 4px 48px; }
+    .day { margin: 18px 8px 8px; }
+  }
+  .tile { position: relative; aspect-ratio: 16 / 9; background: var(--surface); border-radius: 8px;
+    overflow: hidden; cursor: pointer; border: 0; padding: 0; display: block; width: 100%; }
+  .tile img, .tile canvas { width: 100%; height: 100%; object-fit: cover; display: block;
+    opacity: 0; transition: opacity .25s; }
+  .tile img.ready, .tile canvas { opacity: 1; }
+  .tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .badge { position: absolute; right: 6px; bottom: 6px; background: rgba(0,0,0,.7); color: #fff;
+    font-size: 12px; padding: 2px 7px; border-radius: 6px; display: flex; gap: 5px; align-items: center; }
+  .tag { position: absolute; left: 6px; top: 6px; background: rgba(0,0,0,.6); color: #cfd5e2;
+    font-size: 11px; padding: 1px 6px; border-radius: 5px; max-width: calc(100% - 12px);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tile video { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+  .placeholder { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); }
+
+  .state { text-align: center; color: var(--muted); padding: 80px 16px; }
+  .state button { margin-top: 14px; background: var(--accent); border: 0; color: #fff;
+    padding: 8px 18px; border-radius: 999px; cursor: pointer; }
+
+  /* Viewer */
+  .viewer { position: fixed; inset: 0; z-index: 10; background: #000; display: none;
+    flex-direction: column; }
+  .viewer.open { display: flex; }
+  .viewer-top { display: flex; align-items: center; gap: 10px;
+    padding: max(10px, env(safe-area-inset-top)) 12px 10px; background: linear-gradient(#000c, #0000); }
+  .viewer-top .info { flex: 1; min-width: 0; }
+  .viewer-top .info div:first-child { font-weight: 600; }
+  .viewer-top .info div:last-child { color: var(--muted); font-size: 13px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .viewer-top a, .viewer-top button { background: rgba(255,255,255,.12); border: 0; color: #fff;
+    border-radius: 999px; padding: 8px 14px; text-decoration: none; cursor: pointer; font-size: 14px; }
+  .stage { flex: 1; min-height: 0; display: grid; place-items: center; position: relative; }
+  .stage img, .stage video { max-width: 100%; max-height: 100%; display: block; }
+  .nav { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(255,255,255,.12);
+    border: 0; color: #fff; width: 44px; height: 44px; border-radius: 50%; cursor: pointer; font-size: 20px; }
+  .nav.prev { left: 12px; } .nav.next { right: 12px; }
+  .nav:disabled { opacity: .25; cursor: default; }
+  @media (hover: none) { .nav { display: none; } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="bar">
+    <h1>ProsperoGallery<span class="count" id="count"></span></h1>
+    <div class="spacer"></div>
+    <div class="segmented" id="kind">
+      <button data-kind="all" class="on">All</button>
+      <button data-kind="photo">Screenshots</button>
+      <button data-kind="video">Videos</button>
+    </div>
+    <select id="game" aria-label="Game"></select>
+    <button class="icon-btn" id="refresh" title="Refresh" aria-label="Refresh">&#x21bb;</button>
+  </div>
+</header>
+
+<main id="main"><div class="state">Loading…</div></main>
+
+<div class="viewer" id="viewer" role="dialog" aria-modal="true">
+  <div class="viewer-top">
+    <div class="info"><div id="v-date"></div><div id="v-sub"></div></div>
+    <a id="v-download" href="#">Download</a>
+    <button id="v-close" aria-label="Close">&#x2715;</button>
+  </div>
+  <div class="stage" id="stage">
+    <button class="nav prev" id="v-prev" aria-label="Previous">&#x2039;</button>
+    <button class="nav next" id="v-next" aria-label="Next">&#x203a;</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+// ---- Data ----------------------------------------------------------------
+// The server returns paths like
+//   "photo/NPXS40087/PPSA01325/011/20260319_211421_00879891.jpg"
+// so the type, game and date all come from the path itself.
+
+let items = [];               // every capture, newest first
+let titles = {};              // title ID -> game name, from the .dat files
+let shown = [];               // the ones passing the current filters
+let kind = "all";
+let game = "all";
+const thumbs = new Map();     // video path -> { canvas, duration }
+
+const $ = (id) => document.getElementById(id);
+const gameName = (id) => titles[id] || id;
+const mediaUrl = (path) => "/media/" + path.split("/").map(encodeURIComponent).join("/");
+
+function parseItem(path) {
+  const parts = path.split("/");
+  const file = parts[parts.length - 1];
+  const m = file.match(/^(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/);
+  const date = m ? new Date(+m[1], m[2] - 1, +m[3], +m[4], +m[5], +m[6]) : null;
+  return {
+    path,
+    type: parts[0] === "video" ? "video" : "photo",
+    game: parts[2] || "Unknown",
+    file,
+    date,
+    sortKey: m ? m.slice(1).join("") : file,
+  };
+}
+
+async function load() {
+  $("main").innerHTML = '<div class="state">Loading…</div>';
+  try {
+    const res = await fetch("/api/captures", { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    titles = data.titles || {};
+    items = data.captures.map(parseItem).sort((a, b) => b.sortKey.localeCompare(a.sortKey));
+  } catch (err) {
+    $("main").innerHTML = '<div class="state">Couldn\'t reach the console.<br><small>' +
+      escapeHtml(String(err)) + '</small><br><button onclick="load()">Try again</button></div>';
+    $("count").textContent = "";
+    return;
+  }
+  fillGameSelect();
+  render();
+}
+
+function fillGameSelect() {
+  const counts = new Map();
+  for (const it of items) counts.set(it.game, (counts.get(it.game) || 0) + 1);
+  const games = [...counts.keys()].sort((a, b) => gameName(a).localeCompare(gameName(b)));
+  if (game !== "all" && !counts.has(game)) game = "all";
+  $("game").innerHTML = '<option value="all">All games</option>' +
+    games.map((g) => `<option value="${escapeHtml(g)}">${escapeHtml(gameName(g))} (${counts.get(g)})</option>`).join("");
+  $("game").value = game;
+  $("game").style.display = games.length > 1 ? "" : "none";
+}
+
+// ---- Grid ----------------------------------------------------------------
+
+const dayFormat = new Intl.DateTimeFormat(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+const timeFormat = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" });
+
+function render() {
+  shown = items.filter((it) => (kind === "all" || it.type === kind) && (game === "all" || it.game === game));
+  const photos = shown.filter((it) => it.type === "photo").length;
+  $("count").textContent = `${photos} screenshot${photos === 1 ? "" : "s"} · ${shown.length - photos} video${shown.length - photos === 1 ? "" : "s"}`;
+
+  const main = $("main");
+  main.innerHTML = "";
+  observer.disconnect();
+  thumbQueue.length = 0;
+
+  if (shown.length === 0) {
+    main.innerHTML = '<div class="state">' + (items.length ? "Nothing matches these filters." : "No captures yet.") + "</div>";
+    return;
+  }
+
+  let grid = null, lastDay = null;
+  shown.forEach((it, index) => {
+    const day = it.date ? it.date.toDateString() : "Unknown date";
+    if (day !== lastDay) {
+      lastDay = day;
+      const h = document.createElement("div");
+      h.className = "day";
+      h.textContent = it.date ? dayFormat.format(it.date) : "Unknown date";
+      main.appendChild(h);
+      grid = document.createElement("div");
+      grid.className = "grid";
+      main.appendChild(grid);
+    }
+    grid.appendChild(makeTile(it, index));
+  });
+}
+
+function makeTile(it, index) {
+  const tile = document.createElement("button");
+  tile.className = "tile";
+  tile.setAttribute("aria-label", (it.type === "video" ? "Video " : "Screenshot ") + (it.date ? it.date.toLocaleString() : it.file));
+  tile.addEventListener("click", () => openViewer(index));
+
+  if (game === "all") {
+    const tag = document.createElement("span");
+    tag.className = "tag";
+    tag.textContent = gameName(it.game);
+    tile.appendChild(tag);
+  }
+
+  if (it.type === "photo") {
+    const img = document.createElement("img");
+    img.loading = "lazy";
+    img.decoding = "async";
+    img.alt = "";
+    img.onload = () => img.classList.add("ready");
+    img.src = mediaUrl(it.path);
+    tile.prepend(img);
+  } else {
+    const badge = document.createElement("span");
+    badge.className = "badge";
+    badge.innerHTML = "&#x25B6;<span></span>";
+    tile.appendChild(badge);
+    const cached = thumbs.get(it.path);
+    if (cached) {
+      showThumb(tile, cached);
+    } else {
+      const ph = document.createElement("div");
+      ph.className = "placeholder";
+      ph.textContent = "▶";
+      tile.prepend(ph);
+      tile._item = it;
+      observer.observe(tile);
+    }
+  }
+  return tile;
+}
+
+// ---- Video thumbnails ----------------------------------------------------
+// A <video> per tile would keep dozens of connections open. Instead, each
+// video is loaded once in the background (two at a time), one frame is
+// copied onto a canvas, and the video is let go so its connection closes.
+
+// iPhones and iPads don't load videos that aren't on the page, so the canvas
+// trick above never gets a frame there. Instead, the tile gets a real paused
+// <video>; the "#t=1" in its URL makes Safari show the frame at 1 second.
+const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);   // iPadOS reports itself as a Mac
+
+function attachInlineVideo(tile) {
+  const v = document.createElement("video");
+  v.muted = true;
+  v.playsInline = true;
+  v.setAttribute("playsinline", "");
+  v.setAttribute("muted", "");
+  v.preload = "metadata";
+  v.addEventListener("loadedmetadata", () => {
+    if (v.duration) tile.querySelector(".badge span").textContent = formatDuration(v.duration);
+    const ph = tile.querySelector(".placeholder");   // Safari may stop here, before "loadeddata"
+    if (ph) ph.remove();
+  });
+  v.src = mediaUrl(tile._item.path) + "#t=1";
+  tile.prepend(v);
+}
+
+const thumbQueue = [];
+let thumbsRunning = 0;
+
+const observer = new IntersectionObserver((entries) => {
+  for (const e of entries) {
+    if (!e.isIntersecting) continue;
+    observer.unobserve(e.target);
+    if (IS_IOS) attachInlineVideo(e.target);
+    else thumbQueue.push(e.target);
+  }
+  pumpThumbs();
+}, { rootMargin: "300px" });
+
+function pumpThumbs() {
+  while (thumbsRunning < 2 && thumbQueue.length) {
+    const tile = thumbQueue.shift();
+    if (!tile.isConnected) continue;
+    thumbsRunning++;
+    makeThumb(tile._item).then((thumb) => {
+      if (thumb) {
+        thumbs.set(tile._item.path, thumb);
+        if (tile.isConnected) showThumb(tile, thumb);
+      }
+    }).finally(() => { thumbsRunning--; pumpThumbs(); });
+  }
+}
+
+function makeThumb(it) {
+  return new Promise((resolve) => {
+    const v = document.createElement("video");
+    v.muted = true;
+    v.playsInline = true;
+    v.preload = "auto";
+    let duration = 0, finished = false;
+
+    const finish = (thumb) => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      v.removeAttribute("src");
+      v.load();                       // drops the connection
+      resolve(thumb);
+    };
+    const timer = setTimeout(() => finish(null), 10000);
+
+    v.addEventListener("loadedmetadata", () => {
+      duration = v.duration;
+      v.currentTime = Math.min(1, (v.duration || 0) / 2);
+    });
+    v.addEventListener("seeked", () => {
+      const canvas = document.createElement("canvas");
+      const w = 480;
+      canvas.width = w;
+      canvas.height = Math.round(w * (v.videoHeight || 9) / (v.videoWidth || 16));
+      try { canvas.getContext("2d").drawImage(v, 0, 0, canvas.width, canvas.height); }
+      catch { finish({ canvas: null, duration }); return; }
+      finish({ canvas, duration });
+    });
+    v.addEventListener("error", () => finish(null));
+    v.src = mediaUrl(it.path);
+  });
+}
+
+function showThumb(tile, thumb) {
+  const ph = tile.querySelector(".placeholder");
+  if (thumb.canvas) {
+    if (ph) ph.remove();
+    tile.prepend(thumb.canvas);
+  }
+  if (thumb.duration) tile.querySelector(".badge span").textContent = formatDuration(thumb.duration);
+}
+
+function formatDuration(sec) {
+  sec = Math.round(sec);
+  const h = Math.floor(sec / 3600), m = Math.floor(sec / 60) % 60, s = sec % 60;
+  return (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(s).padStart(2, "0");
+}
+
+// ---- Viewer --------------------------------------------------------------
+
+let current = -1;
+
+function openViewer(index) {
+  current = index;
+  $("viewer").classList.add("open");
+  document.body.style.overflow = "hidden";
+  showCurrent();
+}
+
+function closeViewer() {
+  clearStage();
+  current = -1;
+  $("viewer").classList.remove("open");
+  document.body.style.overflow = "";
+}
+
+function clearStage() {
+  const old = $("stage").querySelector("img, video");
+  if (!old) return;
+  if (old.tagName === "VIDEO") { old.pause(); old.removeAttribute("src"); old.load(); }
+  old.remove();
+}
+
+function showCurrent() {
+  const it = shown[current];
+  clearStage();
+
+  let el;
+  if (it.type === "photo") {
+    el = document.createElement("img");
+    el.alt = "";
+  } else {
+    el = document.createElement("video");
+    el.controls = true;
+    el.autoplay = true;
+    el.playsInline = true;
+  }
+  el.src = mediaUrl(it.path);
+  $("stage").prepend(el);
+
+  $("v-date").textContent = it.date ? dayFormat.format(it.date) + ", " + timeFormat.format(it.date) : it.file;
+  $("v-sub").textContent = gameName(it.game) + " · " + it.file;
+  $("v-download").href = mediaUrl(it.path) + "?download";
+  $("v-prev").disabled = current <= 0;
+  $("v-next").disabled = current >= shown.length - 1;
+}
+
+function step(delta) {
+  const next = current + delta;
+  if (next < 0 || next >= shown.length) return;
+  current = next;
+  showCurrent();
+}
+
+$("v-close").onclick = closeViewer;
+$("v-prev").onclick = () => step(-1);
+$("v-next").onclick = () => step(1);
+
+document.addEventListener("keydown", (e) => {
+  if (current < 0) return;
+  if (e.key === "Escape") closeViewer();
+  else if (e.key === "ArrowLeft") step(-1);
+  else if (e.key === "ArrowRight") step(1);
+});
+
+// Swipe left/right on phones (screenshots only, so it can't fight the video seek bar).
+let touchX = null, touchY = null;
+$("stage").addEventListener("touchstart", (e) => {
+  touchX = e.touches[0].clientX; touchY = e.touches[0].clientY;
+}, { passive: true });
+$("stage").addEventListener("touchend", (e) => {
+  if (touchX === null || current < 0 || shown[current].type !== "photo") return;
+  const dx = e.changedTouches[0].clientX - touchX, dy = e.changedTouches[0].clientY - touchY;
+  touchX = null;
+  if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) step(dx < 0 ? 1 : -1);
+});
+
+// ---- Filters -------------------------------------------------------------
+
+$("kind").addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  kind = b.dataset.kind;
+  for (const x of $("kind").children) x.classList.toggle("on", x === b);
+  render();
+});
+$("game").addEventListener("change", (e) => { game = e.target.value; render(); });
+$("refresh").addEventListener("click", load);
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+load();
+</script>
+</body>
+</html>
